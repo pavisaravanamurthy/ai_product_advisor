@@ -1,50 +1,48 @@
-# Welcome to your Expo app 👋
+# Running the App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+1. Install dependencies:
+   npm i
 
-## Get started
+2. Start the Metro bundler:
+   npm start
 
-1. Install dependencies
+3. Run on Android device or emulator:
+   npm run android
 
-   ```bash
-   npm install
-   ```
 
-2. Start the app
+## Architecture
+This project uses a component-based architecture in React Native. The main screen (`ProductAdvisor.tsx`) hosts the UI components, including:
 
-   ```bash
-   npx expo start
-   ```
+- A scrollable chat area displaying messages from the user and AI product advisor.
+- A multiline text input fixed at the bottom with a button.
+- A custom hook `useProductAdvisor` manages filtering the product catalog, constructing prompts, making async calls to an AI API, and managing loading and chat state.
 
-In the output, you'll find options to open the app in a
+Data flow follows a unidirectional pattern:
+User input → `useProductAdvisor` filters products and calls AI API → receives AI recommendations → updates chat messages displayed in scrollable view.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Approach
+- **Minimal and Modern UI:** The design uses a clean, minimal style with a multiline input that expands, a send button right-aligned, and a smooth chat interface.
+- **Keyboard Management:** Using `KeyboardAvoidingView` and fixed input at the bottom ensures UI is not overlapped by the keyboard.
+- **Custom Hook for Logic:** `useProductAdvisor` abstracts chat state, AI communication, and product filtering for separation of concerns and reusability.
+- **Strict AI Prompt:** The prompt to the AI is carefully phrased to prevent hallucination and only recommend products from the given catalog.
+- **Async Loading UI:** Instead of a spinner, a subtle animated "Searching..." skeleton text shows during async calls to improve UX.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+## File Structure
 ```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+ai_product-advisor/
+├── app/
+│   ├── index.tsx                  # Entry point, renders ProductAdvisor
+├── src/
+│   ├── ProductAdvisor.tsx         # Main screen: UI
+│   ├── hooks/
+│   │   └── useProductAdvisor.ts   # Custom hook: product filtering, AI API calls, chat state
+│   ├── utils/
+│   │   └── Constants.ts           # Product catalog and API key constants
+├── assets/
+│   └── fonts/                     # Custom fonts
+├── .github/
+│   └── copilot-instructions.md    # AI agent instructions
+├── eas.json                       # EAS build configuration
+├── README.md                      # Project documentation
+├── package.json                   # Project dependencies and scripts
+```

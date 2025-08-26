@@ -1,10 +1,9 @@
-import { useProductAdvisor } from "@/hooks/useProductAdvisor";
-import { API_KEY, PRODUCT_CATALOG } from "@/utils/Constants";
+import { useProductAdvisor } from "@/src/hooks/useProductAdvisor";
+import { API_KEY, PRODUCT_CATALOG } from "@/src/utils/Constants";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Keyboard,
-  KeyboardAvoidingView,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -12,7 +11,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -81,17 +80,34 @@ function SkeletonText() {
 
 export default function ProductAdvisor() {
   const [input, setInput] = useState("");
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const { messages, loading, sendMessage } = useProductAdvisor({
     products: mappedProducts,
     aiApi,
   });
   const scrollViewRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
+  const inputContainerPosition = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       "keyboardDidShow",
-      () => {
+      (event) => {
+        const keyboardHeight = event.endCoordinates.height;
+        setKeyboardHeight(keyboardHeight);
+        setIsKeyboardVisible(true);
+        
+        const transformValue = Platform.OS === 'ios' 
+          ? -keyboardHeight + (insets.bottom || 0)
+          : -keyboardHeight;
+        
+        Animated.timing(inputContainerPosition, {
+          toValue: transformValue,
+          duration: 250,
+          useNativeDriver: true,
+        }).start();
+
         setTimeout(() => {
           if (scrollViewRef.current) {
             scrollViewRef.current.scrollToEnd({ animated: true });
@@ -99,8 +115,26 @@ export default function ProductAdvisor() {
         }, 100);
       }
     );
-    return () => keyboardDidShowListener.remove();
-  }, []);
+
+    const keyboardDidHideListener = Keyboard.addListener(
+      "keyboardDidHide",
+      () => {
+        setKeyboardHeight(0);
+        setIsKeyboardVisible(false);
+        
+        Animated.timing(inputContainerPosition, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, [insets.bottom, inputContainerPosition]);
 
   useEffect(() => {
     if (loading && scrollViewRef.current) {
@@ -116,73 +150,77 @@ export default function ProductAdvisor() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={{ flex: 1 }} 
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
-    >
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
-        <View style={{ flex: 1 }}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Product Advisor</Text>
-          </View>
-          <ScrollView
-            style={styles.chatContainer}
-            contentContainerStyle={styles.chatContent}
-            ref={scrollViewRef}
-          >
-            {messages.map((msg, idx) => (
-              <View
-                key={idx}
-                style={[
-                  styles.messageBubble,
-                  msg.role === "user"
-                    ? styles.userBubble
-                    : styles.assistantBubble,
-                ]}
-              >
-                <Text
-                  style={
-                    msg.role === "user" ? styles.userText : styles.assistantText
-                  }
-                >
-                  {msg.content}
-                </Text>
-              </View>
-            ))}
-            {loading && (
-              <View style={styles.loaderContainer}>
-                <SkeletonText />
-              </View>
-            )}
-          </ScrollView>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Product Advisor</Text>
+      </View>
+      
+      <ScrollView
+        style={styles.chatContainer}
+        contentContainerStyle={[
+          styles.chatContent,
+          { paddingBottom: 100 } // Space for input
+        ]}
+        ref={scrollViewRef}
+        keyboardShouldPersistTaps="handled"
+      >
+        {messages.map((msg, idx) => (
           <View
-            style={[styles.inputAvoid, { paddingBottom: insets.bottom || 8 }]}
+            key={idx}
+            style={[
+              styles.messageBubble,
+              msg.role === "user"
+                ? styles.userBubble
+                : styles.assistantBubble,
+            ]}
           >
-            <View style={styles.inputRow}>
-              <TextInput
-                style={styles.textInput}
-                multiline
-                value={input}
-                onChangeText={setInput}
-                placeholder="Type your message..."
-                placeholderTextColor="#888"
-                editable={!loading}
-              />
-              <TouchableOpacity
-                style={styles.sendButton}
-                onPress={handleSend}
-                disabled={loading || !input.trim()}
-              >
-                <Text style={styles.sendButtonText}>
-                  {loading ? "..." : "Ask"}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <Text
+              style={
+                msg.role === "user" ? styles.userText : styles.assistantText
+              }
+            >
+              {msg.content}
+            </Text>
           </View>
+        ))}
+        {loading && (
+          <View style={styles.loaderContainer}>
+            <SkeletonText />
+          </View>
+        )}
+      </ScrollView>
+
+      <Animated.View
+        style={[
+          styles.inputContainer,
+          { 
+            paddingBottom: insets.bottom || 8,
+            transform: [{ translateY: inputContainerPosition }]
+          }
+        ]}
+      >
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.textInput}
+            multiline
+            value={input}
+            onChangeText={setInput}
+            placeholder="Type your message..."
+            placeholderTextColor="#888"
+            editable={!loading}
+          />
+          <TouchableOpacity
+            style={styles.sendButton}
+            onPress={handleSend}
+            disabled={loading || !input.trim()}
+          >
+            <Text style={styles.sendButtonText}>
+              {loading ? "..." : "Ask"}
+            </Text>
+          </TouchableOpacity>
         </View>
-      </SafeAreaView>
-    </KeyboardAvoidingView>
+      </Animated.View>
+    </SafeAreaView>
   );
 }
 
@@ -191,12 +229,26 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
   },
+  header: {
+    paddingTop: 24,
+    paddingBottom: 12,
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#222",
+    letterSpacing: 1,
+  },
   chatContainer: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingTop: 16,
   },
   chatContent: {
+    paddingTop: 16,
     paddingBottom: 16,
   },
   messageBubble: {
@@ -219,9 +271,16 @@ const styles = StyleSheet.create({
   assistantText: {
     color: "#222",
   },
-  inputAvoid: {
-    padding: 8,
+  inputContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: "#fff",
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
   },
   inputRow: {
     flexDirection: "row",
@@ -258,29 +317,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 16,
   },
-  header: {
-    paddingTop: 24,
-    paddingBottom: 12,
-    alignItems: "center",
-    backgroundColor: "#fff",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#222",
-    letterSpacing: 1,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: "absolute",
-  },
   loaderContainer: {
     alignSelf: "flex-start",
     marginVertical: 12,
@@ -292,6 +328,7 @@ const styles = StyleSheet.create({
   },
   skeletonLine: {
     height: 16,
+    backgroundColor: "#e0e0e0",
     borderRadius: 8,
     marginBottom: 8,
     width: "90%",
